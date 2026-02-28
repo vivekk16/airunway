@@ -1,20 +1,12 @@
-# KubeAIRunway Kubernetes Deployment
-# Deploy with: kubectl apply -f kubeairunway.yaml
+# KubeAIRunway Dashboard Deployment
+# Deploy with: kubectl apply -f dashboard.yaml
+#
+# NOTE: Deploy controller.yaml first to install CRDs and the controller.
 #
 # This manifest creates:
-# - Namespace: kubeairunway-system
 # - ServiceAccount with RBAC permissions
-# - Deployment running the KubeAIRunway server
+# - Deployment running the KubeAIRunway dashboard server
 # - Service for internal cluster access
-
----
-apiVersion: v1
-kind: Namespace
-metadata:
-  name: kubeairunway-system
-  labels:
-    app.kubernetes.io/name: kubeairunway
-    app.kubernetes.io/part-of: kubeairunway
 
 ---
 # ServiceAccount for KubeAIRunway
@@ -50,11 +42,19 @@ rules:
       - configmaps
     verbs: ["get", "list", "watch", "create", "update", "patch"]
 
-  # Namespaces (read + create only, no delete)
+  # Events (needed for deployment event display)
+  - apiGroups: [""]
+    resources:
+      - events
+    verbs: ["list", "watch"]
+
+  # Namespaces (read + create)
+  # REVIEW: Uncomment "delete" to enable provider uninstall features
   - apiGroups: [""]
     resources:
       - namespaces
     verbs: ["get", "list", "watch", "create"]
+    # verbs: ["get", "list", "watch", "create", "delete"]
 
   # Apps API - Deployments, ReplicaSets
   - apiGroups: ["apps"]
@@ -63,11 +63,33 @@ rules:
       - replicasets
     verbs: ["get", "list", "watch", "create", "update", "patch", "delete"]
 
+  # KubeAIRunway CRDs - ModelDeployments
+  - apiGroups: ["kubeairunway.ai"]
+    resources:
+      - modeldeployments
+      - modeldeployments/status
+    verbs: ["get", "list", "watch", "create", "update", "patch", "delete"]
+
+  # KubeAIRunway CRDs - InferenceProviderConfigs (read + delete for uninstall)
+  - apiGroups: ["kubeairunway.ai"]
+    resources:
+      - inferenceproviderconfigs
+    verbs: ["get", "list", "watch", "delete"]
+
+  # CRD management (needed for provider detection)
+  # REVIEW: Uncomment "delete" to enable provider uninstall features
+  - apiGroups: ["apiextensions.k8s.io"]
+    resources:
+      - customresourcedefinitions
+    verbs: ["get", "list"]
+    # verbs: ["get", "list", "delete"]
+
   # NVIDIA Dynamo CRDs
   - apiGroups: ["nvidia.com"]
     resources:
       - dynamographdeployments
       - dynamographdeployments/status
+      - clusterpolicies
     verbs: ["get", "list", "watch", "create", "update", "patch", "delete"]
 
   # KubeRay CRDs
@@ -78,6 +100,19 @@ rules:
       - rayclusters
       - rayclusters/status
     verbs: ["get", "list", "watch", "create", "update", "patch", "delete"]
+
+  # Gateway API - Gateways and HTTPRoutes (read-only for status display)
+  - apiGroups: ["gateway.networking.k8s.io"]
+    resources:
+      - gateways
+      - httproutes
+    verbs: ["get", "list", "watch"]
+
+  # Gateway API Inference Extension - InferencePools (read-only for status display)
+  - apiGroups: ["inference.networking.k8s.io"]
+    resources:
+      - inferencepools
+    verbs: ["get", "list", "watch"]
 
   # Storage - for PVCs if needed
   - apiGroups: ["storage.k8s.io"]
@@ -118,7 +153,7 @@ metadata:
   labels:
     app.kubernetes.io/name: kubeairunway
     app.kubernetes.io/instance: kubeairunway
-    app.kubernetes.io/component: server
+    app.kubernetes.io/component: dashboard
 spec:
   replicas: 1
   selector:
@@ -130,7 +165,7 @@ spec:
       labels:
         app.kubernetes.io/name: kubeairunway
         app.kubernetes.io/instance: kubeairunway
-        app.kubernetes.io/component: server
+        app.kubernetes.io/component: dashboard
     spec:
       serviceAccountName: kubeairunway
       securityContext:
