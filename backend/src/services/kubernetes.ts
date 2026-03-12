@@ -148,17 +148,6 @@ class KubernetesService {
     return this.customObjectsApi;
   }
 
-  /**
-   * Get the appropriate CoreV1Api client.
-   * Uses the user's token when provided, otherwise the service account.
-   */
-  private getCoreV1Api(userToken?: string): k8s.CoreV1Api {
-    if (userToken) {
-      return this.createUserClients(userToken).coreV1Api;
-    }
-    return this.coreV1Api;
-  }
-
   async checkClusterConnection(): Promise<ClusterStatus> {
     try {
       await withRetry(
@@ -199,7 +188,7 @@ class KubernetesService {
         { operationName: 'listDeployments:allNamespaces' }
       );
 
-      return this.convertToDeploymentStatuses(response, userToken);
+      return this.convertToDeploymentStatuses(response);
     } catch (error: any) {
       const statusCode = error?.statusCode || error?.response?.statusCode;
 
@@ -235,7 +224,7 @@ class KubernetesService {
         { operationName: 'listDeployments' }
       );
 
-      return this.convertToDeploymentStatuses(response, userToken, namespace);
+      return this.convertToDeploymentStatuses(response, namespace);
     } catch (error: any) {
       const statusCode = error?.statusCode || error?.response?.statusCode;
       if (error?.message === 'HTTP request failed' || statusCode === 404 || statusCode === 403) {
@@ -253,7 +242,6 @@ class KubernetesService {
    */
   private async convertToDeploymentStatuses(
     response: { body: unknown },
-    userToken?: string,
     fallbackNamespace?: string
   ): Promise<DeploymentStatus[]> {
     const items = (response.body as { items?: ModelDeployment[] }).items || [];
@@ -262,7 +250,7 @@ class KubernetesService {
     const deployments: DeploymentStatus[] = [];
     for (const item of items) {
       const itemNamespace = item.metadata.namespace || fallbackNamespace || 'default';
-      const pods = await this.getDeploymentPods(item.metadata.name, itemNamespace, userToken);
+      const pods = await this.getDeploymentPods(item.metadata.name, itemNamespace);
       deployments.push(toDeploymentStatus(item, pods));
     }
 
@@ -363,7 +351,7 @@ class KubernetesService {
       );
 
       const md = response.body as ModelDeployment;
-      const pods = await this.getDeploymentPods(name, namespace, userToken);
+      const pods = await this.getDeploymentPods(name, namespace);
       return toDeploymentStatus(md, pods);
     } catch (error: any) {
       const statusCode = error?.statusCode || error?.response?.statusCode;
@@ -451,8 +439,8 @@ class KubernetesService {
     logger.info({ name, namespace }, 'ModelDeployment deleted');
   }
 
-  async getDeploymentPods(name: string, namespace: string, userToken?: string): Promise<PodStatus[]> {
-    const coreApi = this.getCoreV1Api(userToken);
+  async getDeploymentPods(name: string, namespace: string): Promise<PodStatus[]> {
+    const coreApi = this.coreV1Api;
     // Try multiple label selectors since different providers use different labels
     const labelSelectors = [
       `app.kubernetes.io/instance=${name}`,  // Standard K8s label (Dynamo, KubeRay)
@@ -1134,11 +1122,9 @@ class KubernetesService {
   async getPodFailureReasons(
     podName: string,
     namespace: string,
-    userToken?: string
   ): Promise<import('@airunway/shared').PodFailureReason[]> {
     try {
-      // Get events for the pod
-      const coreApi = this.getCoreV1Api(userToken);
+      const coreApi = this.coreV1Api;
       const eventsResponse = await withRetry(
         () => coreApi.listNamespacedEvent(
           namespace,
@@ -1358,10 +1344,9 @@ class KubernetesService {
       tailLines?: number;
       timestamps?: boolean;
     },
-    userToken?: string
   ): Promise<string> {
     try {
-      const coreApi = this.getCoreV1Api(userToken);
+      const coreApi = this.coreV1Api;
       const response = await withRetry(
         () => coreApi.readNamespacedPodLog(
           podName,
