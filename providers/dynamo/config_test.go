@@ -40,9 +40,24 @@ func TestGetProviderConfigSpec(t *testing.T) {
 	if len(spec.SelectionRules) != 4 {
 		t.Fatalf("expected 4 selection rules, got %d", len(spec.SelectionRules))
 	}
+}
 
-	if spec.Documentation != ProviderDocumentation {
-		t.Errorf("expected documentation %s, got %s", ProviderDocumentation, spec.Documentation)
+func TestGetInstallationInfo(t *testing.T) {
+	info := GetInstallationInfo()
+	if info == nil {
+		t.Fatal("expected non-nil installation info")
+	}
+	if info.Description == "" {
+		t.Error("expected non-empty description")
+	}
+	if info.DefaultNamespace != "dynamo-system" {
+		t.Errorf("expected defaultNamespace 'dynamo-system', got %s", info.DefaultNamespace)
+	}
+	if len(info.HelmCharts) != 2 {
+		t.Fatalf("expected 2 helm charts, got %d", len(info.HelmCharts))
+	}
+	if len(info.Steps) != 2 {
+		t.Fatalf("expected 2 installation steps, got %d", len(info.Steps))
 	}
 }
 
