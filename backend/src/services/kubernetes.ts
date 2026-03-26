@@ -246,7 +246,7 @@ class KubernetesService {
 
   async createDeployment(config: DeploymentConfig): Promise<void> {
     // Generate ModelDeployment manifest from config
-    const manifest = toModelDeploymentManifest(config) as Record<string, unknown>;
+    const manifest = toModelDeploymentManifest(config) as unknown as Record<string, unknown>;
 
     logger.info({ name: config.name, namespace: config.namespace }, 'Creating ModelDeployment');
 
@@ -430,10 +430,7 @@ class KubernetesService {
         for (const item of items) {
           const name = item.metadata?.name || 'unknown';
           const status = item.status || {};
-          const installation = item.spec?.installation || {};
-          const displayName = installation.description
-            ? name.charAt(0).toUpperCase() + name.slice(1)
-            : name.charAt(0).toUpperCase() + name.slice(1);
+          const displayName = name.charAt(0).toUpperCase() + name.slice(1);
 
           runtimes.push({
             id: name,
