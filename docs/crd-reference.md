@@ -63,13 +63,45 @@ Each entry is a `StorageVolume`. Maximum 8 volumes per deployment.
 | `accessMode` | string | no | PVC access mode for controller-created PVCs. One of `ReadWriteOnce`, `ReadWriteMany`, `ReadOnlyMany`, `ReadWriteOncePod`. Default: `ReadWriteMany`. Only used when `size` is set. |
 
 ## InferenceProviderConfig
-Cluster-scoped resource for provider registration. Each provider controller self-registers its `InferenceProviderConfig` at startup, declaring capabilities, selection rules, and installation info:
+Cluster-scoped resource for provider registration. Each provider controller self-registers its `InferenceProviderConfig` at startup, declaring capabilities and selection rules in `spec`, and installation/documentation metadata in `metadata.annotations`:
 
 ```yaml
 apiVersion: airunway.ai/v1alpha1
 kind: InferenceProviderConfig
 metadata:
   name: dynamo
+  annotations:
+    airunway.ai/documentation: "https://github.com/kaito-project/dynamo-provider"
+    airunway.ai/installation: |
+      {
+        "description": "NVIDIA Dynamo for GPU-accelerated inference",
+        "defaultNamespace": "dynamo-system",
+        "helmRepos": [
+          { "name": "nvidia-dynamo", "url": "https://helm.ngc.nvidia.com/nvidia/ai-dynamo" }
+        ],
+        "helmCharts": [
+          {
+            "name": "dynamo-crds",
+            "chart": "https://helm.ngc.nvidia.com/nvidia/ai-dynamo/charts/dynamo-crds-0.7.1.tgz",
+            "version": "0.7.1",
+            "namespace": "default"
+          },
+          {
+            "name": "dynamo-platform",
+            "chart": "https://helm.ngc.nvidia.com/nvidia/ai-dynamo/charts/dynamo-platform-0.7.1.tgz",
+            "version": "0.7.1",
+            "namespace": "dynamo-system",
+            "createNamespace": true
+          }
+        ],
+        "steps": [
+          {
+            "title": "Install Dynamo CRDs",
+            "command": "helm install dynamo-crds ...",
+            "description": "Install the Dynamo custom resource definitions"
+          }
+        ]
+      }
 spec:
   capabilities:
     engines: [vllm, sglang, trtllm]
@@ -79,30 +111,17 @@ spec:
   selectionRules:
     - condition: "spec.serving.mode == 'disaggregated'"
       priority: 100
-  installation:
-    description: "NVIDIA Dynamo for GPU-accelerated inference"
-    defaultNamespace: dynamo-system
-    helmRepos:
-      - name: nvidia-dynamo
-        url: https://helm.ngc.nvidia.com/nvidia/ai-dynamo
-    helmCharts:
-      - name: dynamo-crds
-        chart: https://helm.ngc.nvidia.com/nvidia/ai-dynamo/charts/dynamo-crds-0.7.1.tgz
-        version: "0.7.1"
-        namespace: default
-      - name: dynamo-platform
-        chart: https://helm.ngc.nvidia.com/nvidia/ai-dynamo/charts/dynamo-platform-0.7.1.tgz
-        version: "0.7.1"
-        namespace: dynamo-system
-        createNamespace: true
-    steps:
-      - title: Install Dynamo CRDs
-        command: "helm install dynamo-crds ..."
-        description: Install the Dynamo custom resource definitions
 status:
   ready: true
   version: "0.7.1"
 ```
+
+### Annotations
+
+| Annotation | Type | Description |
+|---|---|---|
+| `airunway.ai/documentation` | string | URL to provider documentation |
+| `airunway.ai/installation` | JSON string | Installation metadata (description, defaultNamespace, helmRepos, helmCharts, steps). The backend parses this JSON to show installation commands and steps in the UI. |
 
 ## See also
 
