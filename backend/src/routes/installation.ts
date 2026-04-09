@@ -12,7 +12,11 @@ function parseInstallationAnnotation(config: any): any {
   if (!raw) return {};
   try {
     return JSON.parse(raw);
-  } catch {
+  } catch (error) {
+    logger.warn({
+      provider: config.metadata?.name,
+      error: error instanceof Error ? error.message : 'Unknown error',
+    }, 'Failed to parse installation annotation');
     return {};
   }
 }
